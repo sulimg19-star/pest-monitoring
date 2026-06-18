@@ -9,12 +9,17 @@
         body { font-family: 'Malgun Gothic', sans-serif; margin: 20px; background-color: #f5f7f8; color: #333; }
         h1 { color: #2c3e50; text-align: center; font-size: 20px; margin-bottom: 20px; }
         .container { max-width: 1200px; margin: 0 auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        
+        /* 입력 폼 그리드 배치 */
         .form-group { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 20px; }
         input, select, button { padding: 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; }
+        
         button { background-color: #27ae60; color: white; border: none; cursor: pointer; font-weight: bold; }
         button:hover { background-color: #219653; }
         .btn-excel { background-color: #2980b9; margin-bottom: 15px; float: right; }
         .btn-excel:hover { background-color: #2471a3; }
+        
+        /* 테이블 스타일 */
         .table-wrapper { width: 100%; overflow-x: auto; margin-top: 10px; }
         table { width: 100%; border-collapse: collapse; background: white; min-width: 900px; }
         th, td { border: 1px solid #ddd; padding: 10px 8px; text-align: center; font-size: 13px; }
@@ -29,7 +34,7 @@
     <h1>🐛 전시원 병해충 실시간 모니터링 공유 시스템</h1>
     
     <div class="form-group">
-        <input type="number" id="serialNum" placeholder="연번 (예: 51)" value="51" required>
+        <input type="number" id="serialNum" placeholder="연번" value="51" required>
         <input type="text" id="pathogen" placeholder="병원체/해충명" required>
         <select id="category">
             <option value="">구분 선택</option>
@@ -93,10 +98,12 @@
     const db = getFirestore(app);
     const pestCollection = collection(db, "pest_records");
 
+    // 초기 오늘 날짜 자동 입력
     const today = new Date();
     document.getElementById('occurDate').value = today.toISOString().substring(0, 10);
     document.getElementById('occurYear').value = today.getFullYear();
 
+    // 데이터 실시간 추가 함수
     window.submitData = async function() {
         const serialNum = document.getElementById('serialNum').value;
         const pathogen = document.getElementById('pathogen').value;
@@ -135,7 +142,7 @@
         }
     }
 
-    // 조건 없이 싹 다 긁어오기
+    // 서버 오류를 차단하기 위해 순수 데이터 전체 호출
     const q = query(pestCollection);
     onSnapshot(q, (querySnapshot) => {
         const tbody = document.getElementById('pestTableBody');
@@ -146,14 +153,11 @@
             dataList.push(doc.data());
         });
 
-        // 자바스크립트 안전 정렬
-        dataList.sort((a, b) => {
-            return (parseInt(a.serialNum) || 0) - (parseInt(b.serialNum) || 0);
-        });
+        // 자바스크립트 자체 기능으로 번호 정렬
+        dataList.sort((a, b) => (parseInt(a.serialNum) || 0) - (parseInt(b.serialNum) || 0));
 
         window.currentData = [];
         dataList.forEach((data) => {
-            // 업로드 데이터 명칭 싱크 강제 일치시키기
             const sNum = data.serialNum || '';
             const path = data.pathogen || '';
             const cat = data.category || '';
@@ -191,7 +195,7 @@
             tbody.innerHTML += row;
         });
 
-        // 다음 입력할 연번 자동 지정 (마지막 번호 + 1)
+        // 다음 입력 번호 자동 세팅
         if (dataList.length > 0) {
             const lastNum = parseInt(dataList[dataList.length - 1].serialNum);
             if (!isNaN(lastNum)) {
@@ -200,6 +204,7 @@
         }
     });
 
+    // 엑셀 저장 함수
     window.downloadExcel = function() {
         if (!window.currentData || window.currentData.length === 0) {
             alert("다운로드할 데이터가 없습니다.");
@@ -209,8 +214,4 @@
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, "조사기록취합");
         const todayStr = new Date().toISOString().substring(0, 10);
-        XLSX.writeFile(workbook, `전시원_병해충_조사기록_${todayStr}.xlsx`);
-    }
-</script>
-</body>
-</html>
+        XLSX.writeFile(workbook, `전시원_병해충_조
