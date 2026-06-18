@@ -78,4 +78,113 @@
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getFirestore, collection, addDoc, query, orderBy, onSnapshot } from "
+    import { getFirestore, collection, addDoc, query, orderBy, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyDrMCDQOUcKLuiGy4_X8CqrKvSqnxfmGV0",
+        authDomain: "pest-monitoring-14e79.firebaseapp.com",
+        projectId: "pest-monitoring-14e79",
+        storageBucket: "pest-monitoring-14e79.firebasestorage.app",
+        messagingSenderId: "247600445978",
+        appId: "1:247600445978:web:5f89dd356c4daf73d2afa3"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const pestCollection = collection(db, "pest_records");
+
+    const today = new Date();
+    document.getElementById('occurDate').value = today.toISOString().substring(0, 10);
+    document.getElementById('occurYear').value = today.getFullYear();
+
+    window.submitData = async function() {
+        const serialNum = document.getElementById('serialNum').value;
+        const pathogen = document.getElementById('pathogen').value;
+        const category = document.getElementById('category').value;
+        const occurYear = document.getElementById('occurYear').value;
+        const occurDate = document.getElementById('occurDate').value;
+        const garden = document.getElementById('garden').value;
+        const investigator = document.getElementById('investigator').value;
+        const hostPlant = document.getElementById('hostPlant').value;
+        const memo = document.getElementById('memo').value;
+
+        if (!serialNum || !pathogen || !occurYear || !occurDate || !garden || !investigator) {
+            alert("연번, 병원체, 발생연도, 발생일자, 전시원, 작성자는 필수 입력 항목입니다.");
+            return;
+        }
+
+        try {
+            await addDoc(pestCollection, {
+                serialNum: parseInt(serialNum),
+                pathogen: pathogen,
+                category: category,
+                occurYear: parseInt(occurYear),
+                occurDate: occurDate,
+                garden: garden,
+                investigator: investigator,
+                hostPlant: hostPlant,
+                memo: memo,
+                timestamp: new Date()
+            });
+            
+            document.getElementById('serialNum').value = parseInt(serialNum) + 1;
+            document.getElementById('pathogen').value = '';
+            document.getElementById('hostPlant').value = '';
+            document.getElementById('memo').value = '';
+        } catch (e) {
+            alert("등록 실패: " + e.message);
+        }
+    }
+
+    const q = query(pestCollection, orderBy("serialNum", "asc"), orderBy("timestamp", "desc"));
+    onSnapshot(q, (querySnapshot) => {
+        const tbody = document.getElementById('pestTableBody');
+        tbody.innerHTML = '';
+        window.currentData = [];
+
+        querySnapshot.forEach((doc) => {
+            const data = doc.data();
+            
+            window.currentData.push({
+                '연번': data.serialNum,
+                '병원체': data.pathogen,
+                '구분': data.category || '',
+                '발생연도': data.occurYear,
+                '발생일자': data.occurDate,
+                '전시원': data.garden,
+                '작성자': data.investigator,
+                '기주식물': data.hostPlant || '',
+                '식재번호': '', 
+                '기타': data.memo || ''
+            });
+
+            const row = `<tr>
+                <td>${data.serialNum}</td>
+                <td>${data.pathogen}</td>
+                <td>${data.category || ''}</td>
+                <td>${data.occurYear}</td>
+                <td>${data.occurDate}</td>
+                <td>${data.garden}</td>
+                <td>${data.investigator}</td>
+                <td>${data.hostPlant || ''}</td>
+                <td>${data.memo || ''}</td>
+            </tr>`;
+            tbody.innerHTML += row;
+        });
+    });
+
+    window.downloadExcel = function() {
+        if (!window.currentData || window.currentData.length === 0) {
+            alert("다운로드할 데이터가 없습니다.");
+            return;
+        }
+        const worksheet = XLSX.utils.json_to_sheet(window.currentData);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "조사기록취합");
+        
+        const todayStr = new Date().toISOString().substring(0, 10);
+        XLSX.writeFile(workbook, `전시원_병해충_조사기록_${todayStr}.xlsx`);
+    }
+</script>
+</body>
+</html>
