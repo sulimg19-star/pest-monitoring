@@ -9,11 +9,11 @@
         body { font-family: 'Malgun Gothic', sans-serif; margin: 20px; background-color: #f5f7f8; color: #333; }
         h1 { color: #2c3e50; text-align: center; font-size: 20px; margin-bottom: 20px; }
         .container { max-width: 1200px; margin: 0 auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        .form-group { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; }
-        input, select, button { padding: 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; min-width: 120px; flex: 1; }
-        button { background-color: #27ae60; color: white; border: none; cursor: pointer; font-weight: bold; max-width: 150px; }
+        .form-group { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 20px; }
+        input, select, button { padding: 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; }
+        button { background-color: #27ae60; color: white; border: none; cursor: pointer; font-weight: bold; }
         button:hover { background-color: #219653; }
-        .btn-excel { background-color: #2980b9; margin-bottom: 15px; float: right; max-width: 180px; }
+        .btn-excel { background-color: #2980b9; margin-bottom: 15px; float: right; }
         .table-wrapper { width: 100%; overflow-x: auto; margin-top: 10px; clear: both; }
         table { width: 100%; border-collapse: collapse; background: white; min-width: 900px; }
         th, td { border: 1px solid #ddd; padding: 10px 8px; text-align: center; font-size: 13px; }
@@ -27,7 +27,7 @@
     <h1>🐛 전시원 병해충 실시간 모니터링 공유 시스템</h1>
     
     <div class="form-group">
-        <input type="text" id="serialNum" placeholder="연번" value="51" required>
+        <input type="number" id="serialNum" placeholder="연번" value="51" required>
         <input type="text" id="pathogen" placeholder="병원체/해충명" required>
         <select id="category">
             <option value="">구분 선택</option>
@@ -89,11 +89,12 @@
     const db = getFirestore(app);
     const pestCollection = collection(db, "pest_records");
 
+    // 기본값 자동 세팅
     const today = new Date();
     document.getElementById('occurDate').value = today.toISOString().substring(0, 10);
     document.getElementById('occurYear').value = today.getFullYear();
 
-    // 서버가 에러를 내뿜지 못하게 텍스트 형식으로 안전하게 저장하도록 완전 조치
+    // 데이터 등록 기능 (충돌 원천 차단형)
     window.submitData = async function() {
         const serialNum = document.getElementById('serialNum').value;
         const pathogen = document.getElementById('pathogen').value;
@@ -112,17 +113,21 @@
 
         try {
             await addDoc(pestCollection, {
-                serialNum: serialNum.toString(),
+                serialNum: parseInt(serialNum),
                 pathogen: pathogen,
                 category: category,
-                occurYear: occurYear.toString(),
+                occurYear: parseInt(occurYear),
                 occurDate: occurDate,
                 garden: garden,
                 investigator: investigator,
                 hostPlant: hostPlant,
-                memo: memo
+                memo: memo,
+                timestamp: new Date().getTime()
             });
             alert("성공적으로 등록되었습니다!");
+            
+            // 입력칸 초기화 및 연번 자동 +1 증가
+            document.getElementById('serialNum').value = parseInt(serialNum) + 1;
             document.getElementById('pathogen').value = '';
             document.getElementById('hostPlant').value = '';
             document.getElementById('memo').value = '';
@@ -131,7 +136,7 @@
         }
     }
 
-    // 서버의 모든 골치 아픈 형식 무시하고 무조건 화면에 긁어오기
+    // 데이터 실시간 감지 및 자동 화면 정렬 출력
     onSnapshot(query(pestCollection), (querySnapshot) => {
         const tbody = document.getElementById('pestTableBody');
         tbody.innerHTML = '';
@@ -141,7 +146,7 @@
             dataList.push(doc.data());
         });
 
-        // 어떤 형식이 섞여있어도 에러 안 나게 안전하게 정렬
+        // 연번 순서대로 완벽하게 정렬
         dataList.sort((a, b) => (parseInt(a.serialNum) || 0) - (parseInt(b.serialNum) || 0));
 
         window.currentData = [];
@@ -165,7 +170,7 @@
             </tr>`;
         });
 
-        // 마지막 번호 인식해서 다음 연번 대기
+        // 자동 번호 대기 시스템
         if (dataList.length > 0) {
             const lastNum = parseInt(dataList[dataList.length - 1].serialNum);
             if (!isNaN(lastNum)) {
