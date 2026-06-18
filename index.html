@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>전시원 병해충 모니터링 시스템</title>
+    <!-- SheetJS (엑셀 라이브러리) -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
         body { font-family: 'Malgun Gothic', sans-serif; margin: 20px; background-color: #f5f7f8; color: #333; }
@@ -71,14 +72,15 @@
                 </tr>
             </thead>
             <tbody id="pestTableBody">
-                </tbody>
+                <!-- 데이터 영역 -->
+            </tbody>
         </table>
     </div>
 </div>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getFirestore, collection, addDoc, query, orderBy, onSnapshot, getDocs } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+    import { getFirestore, collection, addDoc, query, onSnapshot, getDocs } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
     const firebaseConfig = {
         apiKey: "AIzaSyDrMCDQOUcKLuiGy4_X8CqrKvSqnxfmGV0",
@@ -97,7 +99,6 @@
     document.getElementById('occurDate').value = today.toISOString().substring(0, 10);
     document.getElementById('occurYear').value = today.getFullYear();
 
-    // 다음 연번 자동 계산 함수
     async function updateNextSerial() {
         try {
             const querySnapshot = await getDocs(pestCollection);
@@ -155,7 +156,6 @@
         }
     }
 
-    // 복잡한 정렬 에러 우회하기 위해 전체를 긁어온 뒤 자바스크립트로 연번 정렬
     const q = query(pestCollection);
     onSnapshot(q, (querySnapshot) => {
         const tbody = document.getElementById('pestTableBody');
@@ -166,7 +166,6 @@
             dataList.push(doc.data());
         });
 
-        // 연번 기준 순서대로 이쁘게 정렬
         dataList.sort((a, b) => parseInt(a.serialNum) - parseInt(b.serialNum));
 
         window.currentData = [];
