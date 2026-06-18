@@ -136,7 +136,7 @@
         }
     }
 
-    const q = query(pestCollection, orderBy("serialNum", "asc"), orderBy("timestamp", "desc"));
+    const q = query(pestCollection, orderBy("serialNum", "asc"));
     onSnapshot(q, (querySnapshot) => {
         const tbody = document.getElementById('pestTableBody');
         tbody.innerHTML = '';
