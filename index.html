@@ -29,7 +29,7 @@
     <h1>🐛 전시원 병해충 실시간 모니터링 공유 시스템</h1>
     
     <div class="form-group">
-        <input type="number" id="serialNum" placeholder="연번" required>
+        <input type="number" id="serialNum" placeholder="연번 (예: 51)" value="51" required>
         <input type="text" id="pathogen" placeholder="병원체/해충명" required>
         <select id="category">
             <option value="">구분 선택</option>
@@ -93,11 +93,9 @@
     const db = getFirestore(app);
     const pestCollection = collection(db, "pest_records");
 
-    // 초기 설정
     const today = new Date();
     document.getElementById('occurDate').value = today.toISOString().substring(0, 10);
     document.getElementById('occurYear').value = today.getFullYear();
-    document.getElementById('serialNum').value = 51; // 51번 자동 대기
 
     window.submitData = async function() {
         const serialNum = document.getElementById('serialNum').value;
@@ -137,7 +135,7 @@
         }
     }
 
-    // 어떠한 정렬 조건도 없이 무조건 순수하게 긁어온 뒤 화면에 뿌리기 (에러 원천 차단)
+    // 조건 없이 싹 다 긁어오기
     const q = query(pestCollection);
     onSnapshot(q, (querySnapshot) => {
         const tbody = document.getElementById('pestTableBody');
@@ -148,37 +146,58 @@
             dataList.push(doc.data());
         });
 
-        // 자바스크립트로 안전하게 정렬
-        dataList.sort((a, b) => parseInt(a.serialNum) - parseInt(b.serialNum));
+        // 자바스크립트 안전 정렬
+        dataList.sort((a, b) => {
+            return (parseInt(a.serialNum) || 0) - (parseInt(b.serialNum) || 0);
+        });
 
         window.currentData = [];
         dataList.forEach((data) => {
+            // 업로드 데이터 명칭 싱크 강제 일치시키기
+            const sNum = data.serialNum || '';
+            const path = data.pathogen || '';
+            const cat = data.category || '';
+            const yr = data.occurYear || 2026;
+            const dt = data.occurDate || '';
+            const gdn = data.garden || '';
+            const inv = data.investigator || '';
+            const hPlant = data.hostPlant || '';
+            const mm = data.memo || '';
+
             window.currentData.push({
-                '연번': data.serialNum,
-                '병원체': data.pathogen,
-                '구분': data.category || '',
-                '발생연도': data.occurYear,
-                '발생일자': data.occurDate,
-                '전시원': data.garden,
-                '작성자': data.investigator,
-                '기주식물': data.hostPlant || '',
+                '연번': sNum,
+                '병원체': path,
+                '구분': cat,
+                '발생연도': yr,
+                '발생일자': dt,
+                '전시원': gdn,
+                '작성자': inv,
+                '기주식물': hPlant,
                 '식재번호': '', 
-                '기타': data.memo || ''
+                '기타': mm
             });
 
             const row = `<tr>
-                <td>${data.serialNum}</td>
-                <td>${data.pathogen}</td>
-                <td>${data.category || ''}</td>
-                <td>${data.occurYear}</td>
-                <td>${data.occurDate}</td>
-                <td>${data.garden}</td>
-                <td>${data.investigator}</td>
-                <td>${data.hostPlant || ''}</td>
-                <td>${data.memo || ''}</td>
+                <td>${sNum}</td>
+                <td>${path}</td>
+                <td>${cat}</td>
+                <td>${yr}</td>
+                <td>${dt}</td>
+                <td>${gdn}</td>
+                <td>${inv}</td>
+                <td>${hPlant}</td>
+                <td>${mm}</td>
             </tr>`;
             tbody.innerHTML += row;
         });
+
+        // 다음 입력할 연번 자동 지정 (마지막 번호 + 1)
+        if (dataList.length > 0) {
+            const lastNum = parseInt(dataList[dataList.length - 1].serialNum);
+            if (!isNaN(lastNum)) {
+                document.getElementById('serialNum').value = lastNum + 1;
+            }
+        }
     });
 
     window.downloadExcel = function() {
