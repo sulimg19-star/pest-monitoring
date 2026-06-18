@@ -1,83 +1,163 @@
-import streamlit as st
-import pandas as pd
-from datetime import datetime
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>전시원 병해충 실시간 모니터링 시스템</title>
+    <!-- SheetJS (엑셀 다운로드용 라이브러리) -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <style>
+        body { font-family: 'Malgun Gothic', sans-serif; margin: 20px; background-color: #f5f7f8; color: #333; }
+        h1 { color: #2c3e50; text-align: center; }
+        .container { max-width: 1000px; margin: 0 auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .form-group { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin-bottom: 20px; }
+        input, select, button { padding: 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }
+        button { background-color: #27ae60; color: white; border: none; cursor: pointer; font-weight: bold; }
+        button:hover { background-color: #219653; }
+        .btn-excel { background-color: #2980b9; margin-bottom: 10px; float: right; }
+        .btn-excel:hover { background-color: #2471a3; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; background: white; }
+        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+        th { background-color: #f2f2f2; color: #2c3e50; }
+        tr:nth-child(even) { background-color: #f9f9f9; }
+        .clear { clear: both; }
+    </style>
+</head>
+<body>
 
-# 앱 설정
-st.set_page_config(page_title="백두대간 전자야장", layout="wide")
+<div class="container">
+    <h1>🐛 병해충 예찰 실시간 공유 시스템</h1>
+    
+    <!-- 데이터 입력 폼 -->
+    <div class="form-group">
+        <input type="date" id="pestDate" required>
+        <select id="investigator">
+            <option value="">조사자 선택</option>
+            <option value="김수림">김수림</option>
+            <option value="주임님">주임님</option>
+        </select>
+        <input type="text" id="location" placeholder="발견 위치 (예: 만병초원)" required>
+        <input type="text" id="pestName" placeholder="병해충명 (예: 미국선녀벌레)" required>
+        <input type="text" id="memo" placeholder="특이사항 및 메모">
+        <button onclick="submitData()">실시간 등록</button>
+    </div>
 
-st.title("🌲 2026 병해충 모니터링 전자야장")
-st.write("현장에서 데이터를 입력하고, 하단에서 **엑셀(CSV)** 파일로 추출하세요.")
+    <hr>
 
-# 데이터 저장용 세션 상태 초기화
-if 'data_list' not in st.session_state:
-    st.session_state.data_list = []
+    <!-- 엑셀 다운로드 버튼 -->
+    <button class="btn-excel" onclick="downloadExcel()">📊 현재까지 데이터 엑셀 다운로드</button>
+    <div class="clear"></div>
 
-col1, col2 = st.columns([1, 2])
+    <!-- 실시간 데이터 출력 테이블 -->
+    <table>
+        <thead>
+            <tr>
+                <th>날짜</th>
+                <th>조사자</th>
+                <th>위치</th>
+                <th>병해충명</th>
+                <th>특이사항</th>
+            </tr>
+        </thead>
+        <tbody id="pestTableBody">
+            <!-- 실시간으로 데이터가 여기에 쌓입니다 -->
+        </tbody>
+    </table>
+</div>
 
-with col1:
-    st.header("📍 데이터 입력")
-    with st.form("monitoring_form", clear_on_submit=True):
-        # 1. 발생연도 (2026년 고정)
-        st.info("📅 발생연도: 2026년")
-        
-        # 2. 발생일자 (오늘 날짜 자동 선택)
-        occurrence_date = st.date_input("발생일자", datetime.now())
-        
-        # 3. 구분 (병/해충 선택) - 수림님이 요청하신 부분!
-        category = st.radio("구분", ["생물(병)", "생물(해충)"], horizontal=True)
-        
-        # 4. 서술형 항목들
-        exhibition_garden = st.text_input("전시원 (직접 작성)")
-        writer = st.text_input("작성자 (직접 작성)")
-        plant_name = st.text_input("식물명 (직접 작성)")
-        planting_number = st.text_input("식재번호 (직접 작성)")
-        cause = st.text_area("피해원인 (서술형 직접 작성)")
-        
-        # 5. 기타 (기본값 '없음', 필요시 수정)
-        etc = st.text_input("기타", value="없음")
-        
-        submitted = st.form_submit_button("야장 기록 추가")
-        
-        if submitted:
-            # 순번 자동 계산 (리스트 길이에 따라 1번부터 차례대로)
-            next_no = len(st.session_state.data_list) + 1
+<!-- Firebase 모듈 및 실시간 동기화 스크립트 -->
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getFirestore, collection, addDoc, query, orderBy, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+    // 수림님의 실제 파이어베이스 설정값 연동
+    const firebaseConfig = {
+        apiKey: "AIzaSyDrMCDQOUcKLuiGy4_X8CqrKvSqnxfmGV0",
+        authDomain: "pest-monitoring-14e79.firebaseapp.com",
+        projectId: "pest-monitoring-14e79",
+        storageBucket: "pest-monitoring-14e79.firebasestorage.app",
+        messagingSenderId: "247600445978",
+        appId: "1:247600445978:web:5f89dd356c4daf73d2afa3"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const pestCollection = collection(db, "pest_records");
+
+    document.getElementById('pestDate').value = new Date().toISOString().substring(0, 10);
+
+    window.submitData = async function() {
+        const date = document.getElementById('pestDate').value;
+        const investigator = document.getElementById('investigator').value;
+        const location = document.getElementById('location').value;
+        const pestName = document.getElementById('pestName').value;
+        const memo = document.getElementById('memo').value;
+
+        if (!date || !investigator || !location || !pestName) {
+            alert("조사자, 위치, 병해충명은 필수 입력 항목입니다.");
+            return;
+        }
+
+        try {
+            await addDoc(pestCollection, {
+                date: date,
+                investigator: investigator,
+                location: location,
+                pestName: pestName,
+                memo: memo,
+                timestamp: new Date()
+            });
             
-            new_entry = {
-                "순번": next_no,
-                "발생연도": "2026년",
-                "발생일자": occurrence_date.strftime("%Y-%m-%d"),
-                "구분": category,
-                "전시원": exhibition_garden,
-                "작성자": writer,
-                "식물명": plant_name,
-                "식재번호": planting_number,
-                "피해원인": cause,
-                "기타": etc
-            }
-            st.session_state.data_list.append(new_entry)
-            st.success(f"✅ {next_no}번 데이터가 추가되었습니다!")
+            document.getElementById('location').value = '';
+            document.getElementById('pestName').value = '';
+            document.getElementById('memo').value = '';
+        } catch (e) {
+            console.error("데이터 추가 에러: ", e);
+            alert("등록에 실패했습니다.");
+        }
+    }
 
-with col2:
-    st.header("📋 모니터링 기록 목록")
-    if st.session_state.data_list:
-        df = pd.DataFrame(st.session_state.data_list)
-        # 표 보여주기 (인덱스 제외)
-        st.dataframe(df, use_container_width=True, hide_index=True)
+    const q = query(pestCollection, orderBy("date", "desc"), orderBy("timestamp", "desc"));
+    onSnapshot(q, (querySnapshot) => {
+        const tbody = document.getElementById('pestTableBody');
+        tbody.innerHTML = ''; 
         
-        # 엑셀(CSV) 추출 버튼
-        csv_data = df.to_csv(index=False).encode('utf-8-sig')
+        window.currentData = []; 
+
+        querySnapshot.forEach((doc) => {
+            const data = doc.data();
+            window.currentData.push({
+                '날짜': data.date,
+                '조사자': data.investigator,
+                '위치': data.location,
+                '병해충명': data.pestName,
+                '특이사항': data.memo
+            });
+
+            const row = `<tr>
+                <td>${data.date}</td>
+                <td>${data.investigator}</td>
+                <td>${data.location}</td>
+                <td>${data.pestName}</td>
+                <td>${data.memo || ''}</td>
+            </tr>`;
+            tbody.innerHTML += row;
+        });
+    });
+
+    window.downloadExcel = function() {
+        if (!window.currentData || window.currentData.length === 0) {
+            alert("다운로드할 데이터가 없습니다.");
+            return;
+        }
+        const worksheet = XLSX.utils.json_to_sheet(window.currentData);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "병해충조사기록");
         
-        st.markdown("---")
-        st.subheader("💾 데이터 저장")
-        st.download_button(
-            label="📊 현재까지 기록 엑셀(CSV) 다운로드",
-            data=csv_data,
-            file_name=f"병해충_모니터링_결과_{datetime.now().strftime('%Y%m%d')}.csv",
-            mime='text/csv',
-        )
-        
-        if st.button("🗑️ 전체 목록 지우기"):
-            st.session_state.data_list = []
-            st.rerun()
-    else:
-        st.info("아직 입력된 데이터가 없습니다. 왼쪽에서 입력을 시작해 주세요.")
+        const today = new Date().toISOString().substring(0, 10);
+        XLSX.writeFile(workbook, `병해충_조사기록_취합_${today}.xlsx`);
+    }
+</script>
+
+</body>
+</html>
